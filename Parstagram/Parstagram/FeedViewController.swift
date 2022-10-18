@@ -28,7 +28,7 @@ class FeedViewController: UIViewController, UITableViewDelegate, UITableViewData
         super.viewDidAppear(animated)
         
         let query = PFQuery(className: "Posts")
-        query.includeKey("author")
+        query.includeKeys(["author", "comments", "comments.author"])
         query.limit = 20
         
         query.findObjectsInBackground { (posts, error) in
@@ -42,34 +42,99 @@ class FeedViewController: UIViewController, UITableViewDelegate, UITableViewData
     
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return posts.count
+        let post = posts[section]
+        let comments = (post["comments"] as? [PFObject]) ?? []
+        
+        return comments.count + 1
+    }
+    
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return self.posts.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "PostCell") as! PostCell
+        let post = posts[indexPath.row]
+        let comments = (post["comments"] as? [PFObject]) ?? []
         
+        if indexPath.row == 0 {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "PostCell") as! PostCell
+            
+            let user = post["author"] as! PFUser
+            cell.usernameLabel.text = user.username
+            
+            cell.captionLabel.text = post["caption"] as! String
+            
+            let imageFile = post["image"] as! PFFileObject
+            let urlString = imageFile.url!
+            let url = URL(string: urlString)!
+            
+            cell.photoView.af.setImage(withURL: url)
+            
+            return cell
+        
+        } else {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "CommentCell") as! CommentCell
+            
+            print("HELLLOOOOOO")
+            print(indexPath.row - 1)
+            
+            if !comments.isEmpty {
+                let comment = comments[indexPath.row - 1]
+                
+                cell.nameLabel.text = comment["text"] as? String
+                
+                let user = comment["author"] as! PFUser
+                cell.nameLabel.text = user.username
+            }
+            
+            
+            return cell
+        }
+        
+        
+        
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let post = posts[indexPath.row]
         
-        let user = post["author"] as! PFUser
-        cell.usernameLabel.text = user.username
+        // even though I don't have a table comments, Parse will auto-create it
+        // YOu can always come back later and add a column
         
-        cell.captionLabel.text = post["caption"] as! String
+        //let comment = PFObject(className: "Comments")
+        //comment["text"] = "This is a random comment"
+        //comment["post"] = post
+        //comment["author"] = PFUser.current()!
         
-        let imageFile = post["image"] as! PFFileObject
-        let urlString = imageFile.url!
-        let url = URL(string: urlString)!
+        //post.add(comment, forKey: "comments")
         
-        cell.photoView.af.setImage(withURL: url)
-        
-        return cell
+        //post.saveInBackground { (success, error) in
+          //  if success {
+            //    print("Comment saved")
+            //} else {
+              //  print("Error saving comment")
+            //}
+        //}
         
     }
+    
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 200
+        return 350
     }
     
-
+    @IBAction func onLogoutButton(_ sender: Any) {
+        
+        PFUser.logOut()
+        
+        let main = UIStoryboard(name: "Main", bundle: nil)
+        let loginViewController = main.instantiateViewController(withIdentifier: "LoginViewController")
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene, let delegate = windowScene.delegate as? SceneDelegate else {return}
+        
+        delegate.window?.rootViewController = loginViewController
+    }
+    
     /*
     // MARK: - Navigation
 
